@@ -8,14 +8,14 @@
     <groupId>com.bc.merisva</groupId>
     <artifactId>merisva-reader</artifactId>
     <name>MERIS-VA Product Reader</name>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <url>http://envisat.esa.int/beam/</url>
 
     <dependencies>
         <dependency>
             <groupId>org.esa.beam</groupId>
             <artifactId>beam-core</artifactId>
-            <version>4.2</version>
+            <version>4.2.1</version>
         </dependency>
         <dependency>
             <groupId>ncsa.hdf</groupId>
