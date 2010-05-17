@@ -28,64 +28,43 @@ import java.io.IOException;
 
 class MerisVaBand {
 
-    private int _datasetID;
-    private int _dataspaceID;
-    private int _dataTypeID;
-    private int _memDataspaceID;
-    private long[] _start;
-    private long[] _memStart;
-    private long[] _count;
-    private long[] _stride;
-    private long[] _block;
-    private int _lineWidth;
-    private int _pDataType;
-    private Object _line;
+    private int datasetID;
+    private int dataspaceID;
+    private int dataTypeID;
+    private int memDataspaceID;
+    private int lineWidth;
+    private int pDataType;
+    private Object line;
 
     /**
      * Constructs the object with default values.
      */
     MerisVaBand() {
-        _datasetID = -1;
-        _dataspaceID = -1;
-        _dataTypeID = -1;
-        _memDataspaceID = -1;
+        datasetID = -1;
+        dataspaceID = -1;
+        dataTypeID = -1;
+        memDataspaceID = -1;
     }
 
-    /**
+    /*
      * Initializes the object with given daset and dataspace id.
-     *
-     * @param datasetId
-     * @param dataspaceID
      */
+
     void init(int datasetId, int dataspaceID, int dataTypeID) throws ProductIOException {
-        _datasetID = datasetId;
-        _dataspaceID = dataspaceID;
-        _dataTypeID = dataTypeID;
-
-        _start = new long[2];
-        _memStart = new long[2];
-        _memStart[0] = 0;
-        _memStart[1] = 0;
-
-        _count = new long[2];
-        _count[0] = 1;
-
-        _stride = new long[2];
-        _stride[0] = 1;
-        _block = new long[2];
-        _block[0] = 1;
-        _block[1] = 1;
+        datasetID = datasetId;
+        this.dataspaceID = dataspaceID;
+        this.dataTypeID = dataTypeID;
 
         try {
             long[] size = new long[2];
             long[] maxSize = new long[2];
 
             H5.H5Sget_simple_extent_dims(dataspaceID, size, maxSize);
-            _lineWidth = (int) maxSize[1];
-            _pDataType = H5Utils.convertHdfToProductDataType(_dataTypeID);
+            lineWidth = (int) maxSize[1];
+            pDataType = H5Utils.convertHdfToProductDataType(this.dataTypeID);
             createLineBuffer();
 
-            _memDataspaceID = H5.H5Screate_simple(2, new long[]{1, _lineWidth}, new long[]{1, _lineWidth});
+            memDataspaceID = H5.H5Screate_simple(2, new long[]{1, lineWidth}, new long[]{1, lineWidth});
         } catch (HDF5Exception e) {
             throw new ProductIOException(e.getMessage());
         }
@@ -101,51 +80,60 @@ class MerisVaBand {
      * @param sourceY      the Y-offset (zero-based line index) in source raster co-ordinates
      * @param destBuffer   the destination raster which receives the sample values to be read
      * @param destArrayPos the current line offset within the destination raster
+     *
+     * @throws java.io.IOException if the data could not be read
      */
-    void readRasterLine(int sourceMinX, int sourceMaxX, int sourceStepX,
-                        int sourceY, ProductData destBuffer, int destArrayPos) throws IOException {
-        _start[0] = sourceY;
-        _start[1] = sourceMinX;
-        _stride[1] = sourceStepX;
-        _count[1] = sourceMaxX - sourceMinX + 1;
-
+    synchronized void readRasterLine(int sourceMinX, int sourceMaxX, int sourceStepX,
+                                     int sourceY, ProductData destBuffer, int destArrayPos) throws IOException {
+        long[] start = new long[]{sourceY, sourceMinX};
+        long[] stride = new long[]{1, sourceStepX};
+        long[] count = new long[]{1, sourceMaxX - sourceMinX + 1};
         try {
-            H5.H5Sselect_hyperslab(_memDataspaceID, HDF5Constants.H5S_SELECT_SET, _memStart, _stride, _count, null);
-            H5.H5Sselect_hyperslab(_dataspaceID, HDF5Constants.H5S_SELECT_SET, _start, _stride, _count, null);
-            H5.H5Dread(_datasetID, _dataTypeID, _memDataspaceID, _dataspaceID, HDF5Constants.H5P_DEFAULT, _line);
-            copyData(destBuffer, destArrayPos, (int) _count[1]);
+            long[] memStart = new long[]{0, 0};
+            H5.H5Sselect_hyperslab(memDataspaceID, HDF5Constants.H5S_SELECT_SET, memStart, stride, count, null);
+            H5.H5Sselect_hyperslab(dataspaceID, HDF5Constants.H5S_SELECT_SET, start, stride, count, null);
+            H5.H5Dread(datasetID, dataTypeID, memDataspaceID, dataspaceID, HDF5Constants.H5P_DEFAULT, line);
+            copyData(destBuffer, destArrayPos, (int) count[1]);
         } catch (HDF5Exception e) {
             throw new ProductIOException(e.getMessage());
-        } finally {
         }
     }
 
-    /**
+    /*
      * Closes the band.
      */
+
     void close() throws IOException {
-        if (_dataTypeID >= 0) {
+        if (dataTypeID >= 0) {
             try {
-                H5.H5Tclose(_dataTypeID);
-                _dataTypeID = -1;
+                H5.H5Tclose(dataTypeID);
+                dataTypeID = -1;
             } catch (HDF5LibraryException e) {
                 throw new ProductIOException(e.getMessage());
             }
         }
 
-        if (_dataspaceID >= 0) {
+        if (dataspaceID >= 0) {
             try {
-                H5.H5Sclose(_dataspaceID);
-                _dataspaceID = -1;
+                H5.H5Sclose(dataspaceID);
+                dataspaceID = -1;
             } catch (HDF5LibraryException e) {
                 throw new ProductIOException(e.getMessage());
             }
         }
 
-        if (_datasetID >= 0) {
+        if (datasetID >= 0) {
             try {
-                H5.H5Dclose(_datasetID);
-                _datasetID = -1;
+                H5.H5Dclose(datasetID);
+                datasetID = -1;
+            } catch (HDF5LibraryException e) {
+                throw new ProductIOException(e.getMessage());
+            }
+        }
+        if (memDataspaceID >= 0) {
+            try {
+                H5.H5Sclose(memDataspaceID);
+                memDataspaceID = -1;
             } catch (HDF5LibraryException e) {
                 throw new ProductIOException(e.getMessage());
             }
@@ -158,7 +146,7 @@ class MerisVaBand {
      * @return the dataset ID
      */
     int getDatasetID() {
-        return _datasetID;
+        return datasetID;
     }
     ///////////////////////////////////////////////////////////////////////////
     // END OF PACKAGE-ACCESS
@@ -168,56 +156,47 @@ class MerisVaBand {
      * Creates a line buffer according to the datatype of the dataspace stored.
      */
     private void createLineBuffer() {
-        if (_pDataType == ProductData.TYPE_FLOAT32) {
-            _line = new float[_lineWidth];
-        } else if (_pDataType == ProductData.TYPE_FLOAT64) {
-            _line = new double[_lineWidth];
-        } else if ((_pDataType == ProductData.TYPE_INT8) || (_pDataType == ProductData.TYPE_UINT8)) {
-            _line = new byte[_lineWidth];
-        } else if ((_pDataType == ProductData.TYPE_INT16) || (_pDataType == ProductData.TYPE_UINT16)) {
-            _line = new short[_lineWidth];
-        } else if ((_pDataType == ProductData.TYPE_INT32) || (_pDataType == ProductData.TYPE_UINT32)) {
-            _line = new int[_lineWidth];
+        if (pDataType == ProductData.TYPE_FLOAT32) {
+            line = new float[lineWidth];
+        } else if (pDataType == ProductData.TYPE_FLOAT64) {
+            line = new double[lineWidth];
+        } else if ((pDataType == ProductData.TYPE_INT8) || (pDataType == ProductData.TYPE_UINT8)) {
+            line = new byte[lineWidth];
+        } else if ((pDataType == ProductData.TYPE_INT16) || (pDataType == ProductData.TYPE_UINT16)) {
+            line = new short[lineWidth];
+        } else if ((pDataType == ProductData.TYPE_INT32) || (pDataType == ProductData.TYPE_UINT32)) {
+            line = new int[lineWidth];
         }
     }
 
-    /**
+    /*
      * Copies the data from the line read from file to the ProductData buffer.
      *
      * @param destBuffer   the data buffer
      * @param destArrayPos the offset in samples to the data buffer start
      */
+
     private void copyData(ProductData destBuffer, int destArrayPos, int elemCount) {
-        if (_pDataType == ProductData.TYPE_FLOAT32) {
+        if (pDataType == ProductData.TYPE_FLOAT32) {
             float[] dest = (float[]) destBuffer.getElems();
-            float[] source = (float[]) _line;
-            for (int n = 0; n < elemCount; n++) {
-                dest[n + destArrayPos] = source[n];
-            }
-        } else if (_pDataType == ProductData.TYPE_FLOAT64) {
+            float[] source = (float[]) line;
+            System.arraycopy(source, 0, dest, destArrayPos, elemCount);
+        } else if (pDataType == ProductData.TYPE_FLOAT64) {
             double[] dest = (double[]) destBuffer.getElems();
-            double[] source = (double[]) _line;
-            for (int n = 0; n < elemCount; n++) {
-                dest[n + destArrayPos] = source[n];
-            }
-        } else if ((_pDataType == ProductData.TYPE_INT8) || (_pDataType == ProductData.TYPE_UINT8)) {
+            double[] source = (double[]) line;
+            System.arraycopy(source, 0, dest, destArrayPos, elemCount);
+        } else if ((pDataType == ProductData.TYPE_INT8) || (pDataType == ProductData.TYPE_UINT8)) {
             byte[] dest = (byte[]) destBuffer.getElems();
-            byte[] source = (byte[]) _line;
-            for (int n = 0; n < elemCount; n++) {
-                dest[n + destArrayPos] = source[n];
-            }
-        } else if ((_pDataType == ProductData.TYPE_INT16) || (_pDataType == ProductData.TYPE_UINT16)) {
+            byte[] source = (byte[]) line;
+            System.arraycopy(source, 0, dest, destArrayPos, elemCount);
+        } else if ((pDataType == ProductData.TYPE_INT16) || (pDataType == ProductData.TYPE_UINT16)) {
             short[] dest = (short[]) destBuffer.getElems();
-            short[] source = (short[]) _line;
-            for (int n = 0; n < elemCount; n++) {
-                dest[n + destArrayPos] = source[n];
-            }
-        } else if ((_pDataType == ProductData.TYPE_INT32) || (_pDataType == ProductData.TYPE_UINT32)) {
+            short[] source = (short[]) line;
+            System.arraycopy(source, 0, dest, destArrayPos, elemCount);
+        } else if ((pDataType == ProductData.TYPE_INT32) || (pDataType == ProductData.TYPE_UINT32)) {
             int[] dest = (int[]) destBuffer.getElems();
-            int[] source = (int[]) _line;
-            for (int n = 0; n < elemCount; n++) {
-                dest[n + destArrayPos] = source[n];
-            }
+            int[] source = (int[]) line;
+            System.arraycopy(source, 0, dest, destArrayPos, elemCount);
         }
     }
 }

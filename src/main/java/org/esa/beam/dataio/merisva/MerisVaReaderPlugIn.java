@@ -17,9 +17,9 @@
 
 package org.esa.beam.dataio.merisva;
 
+import org.esa.beam.framework.dataio.DecodeQualification;
 import org.esa.beam.framework.dataio.ProductReader;
 import org.esa.beam.framework.dataio.ProductReaderPlugIn;
-import org.esa.beam.framework.dataio.DecodeQualification;
 import org.esa.beam.util.io.BeamFileFilter;
 import org.esa.beam.util.logging.BeamLogManager;
 
@@ -55,19 +55,14 @@ public class MerisVaReaderPlugIn implements ProductReaderPlugIn {
         return h5LibraryAvailable;
     }
 
+    @Override
     public DecodeQualification getDecodeQualification(Object input) {
         if (!isHdf5LibAvailable()) {
             return DecodeQualification.UNABLE;
         }
-        File file = null;
+        File file = new File(input.toString());
 
-        if (input instanceof String) {
-            file = new File((String) input);
-        } else if (input instanceof File) {
-            file = (File) input;
-        }
-
-        if (file != null && file.exists() && file.isFile()) {
+        if (file.exists() && file.isFile()) {
             if (file.getPath().toLowerCase().endsWith(H5_FILE_EXTENSION)) {
                 // @todo - check if the h5open testreading the file is really expensive
                 // if not - implement this here
@@ -88,6 +83,7 @@ public class MerisVaReaderPlugIn implements ProductReaderPlugIn {
      *
      * @return an array containing valid input types, never <code>null</code>
      */
+    @Override
     public Class[] getInputTypes() {
         if (!isHdf5LibAvailable()) {
             return new Class[0];
@@ -101,6 +97,7 @@ public class MerisVaReaderPlugIn implements ProductReaderPlugIn {
      *
      * @return a new reader instance, never <code>null</code>
      */
+    @Override
     public ProductReader createReaderInstance() {
         if (!isHdf5LibAvailable()) {
             return null;
@@ -115,6 +112,7 @@ public class MerisVaReaderPlugIn implements ProductReaderPlugIn {
      *
      * @return a new writer instance, never <code>null</code>
      */
+    @Override
     public String[] getFormatNames() {
         if (!isHdf5LibAvailable()) {
             return new String[0];
@@ -131,6 +129,7 @@ public class MerisVaReaderPlugIn implements ProductReaderPlugIn {
      *
      * @return the default file extensions for this product I/O plug-in, never <code>null</code>
      */
+    @Override
     public String[] getDefaultFileExtensions() {
         if (!isHdf5LibAvailable()) {
             return new String[0];
@@ -146,10 +145,12 @@ public class MerisVaReaderPlugIn implements ProductReaderPlugIn {
      *
      * @return a textual description of this product reader/writer
      */
+    @Override
     public String getDescription(Locale locale) {
         return MERIS_VA_DESCRIPTION;
     }
 
+    @Override
     public BeamFileFilter getProductFileFilter() {
         final String[] formatNames = getFormatNames();
         final String formatName;
